@@ -33,7 +33,8 @@ function get_fusion_seqs() {
 
   res=${tokens[18]}
 
-  if [[ ${field1} =~ "sample" ]]
+  # NOTE must match the header as defined in compile_results.R
+  if [[ ${field2} == "fusion" ]]
   then
     return
   fi

@@ -23,11 +23,11 @@ get_unmapped_as_fasta = segment { prepare_reads + get_unmapped }
 if(args[0].endsWith(fastaSuffix)) {
    run { run_check + fastaInputFormat * [
 	     align_transcripts_to_annotation +
-	     common_steps + 
+	     common_steps +
 	     make_fasta_reads_table +
 	     get_final_list ] + compile_all_results
-   } 
-// or you can provide the reads and they will be 
+   }
+// or you can provide the reads and they will be
 // filtered and converted to fasta before running
 // the same pipeline as above
 } else {
@@ -37,7 +37,7 @@ if(args[0].endsWith(fastaSuffix)) {
 	    align_reads_to_annotation +
 	    common_steps +
 	    make_simple_reads_table +
-	    get_final_list ] + compile_all_results 
+      remove_frequent_flyers +
+	    get_final_list ] + compile_all_results
    }
 }
-
