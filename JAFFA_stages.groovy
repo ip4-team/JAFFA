@@ -1,6 +1,6 @@
 /*********************************************************************************
  ** This file defines all the JAFFA pipeline stages (used in JAFFA_assembly.groovy, JAFFA_hybrid.groovy and
- ** JAFFA_direct.groovy). See our website for details on running, 
+ ** JAFFA_direct.groovy). See our website for details on running,
  ** https://github.com/Oshlack/JAFFA.
  **
  ** Author: Nadia Davidson <nadia.davidson@petermac.org>, Rebecca Evans <rebecca.evans@petermac.org>
@@ -18,8 +18,9 @@ refBase = codeBase
 // Path to reference files that are elsewhere on the file system
 // refBase = "/path/to/reference/directory"
 
-// Path to reference files 
-// env = System.getenv()
+// Path to reference files
+env = System.getenv()
+
 // refBase = env['GENOMES']
 
 // Should there be a folder structure for the reference files within the reference folder then
@@ -30,17 +31,17 @@ transBase = refBase
 
 
 /**********  Parameters that are likely to change between runs of JAFFA **************/
-/*** These are usually set with the -p option in bpipe, but may also be set here    **/ 
+/*** These are usually set with the -p option in bpipe, but may also be set here    **/
 
 readLayout="paired" //change to "single" or single-end reads
 
-// Genome, Transcriptome and related data paths. 
+// Genome, Transcriptome and related data paths.
 genome="hg38"
 annotation="genCode22"
 
 // You have two options:
 // 1) put the full file name (including path) below. e.g. genomeFasta=<path_to_genome>/<genome_file_name>
-// or 2) leave as is and place or symlink the data files to the jaffa code directory. 
+// or 2) leave as is and place or symlink the data files to the jaffa code directory.
 // e.g. ln -s <path_to_genome> <path_to_jaffa_code_directory>
 genomeFasta=fastaBase+"/"+genome+".fa"  //genome sequence
 
@@ -51,7 +52,7 @@ fastqInputFormat="%_*.fastq.gz"
 
 // Simlar to above for running JAFFA_direct with a fasta file.
 // You should not need to change this unless the suffix is ".fa" instead of ".fasta"
-fastaSuffix="fasta"  
+fastaSuffix="fasta"
 fastaInputFormat="%."+fastaSuffix
 
 /***************** Other configurables *************************************/
@@ -81,8 +82,8 @@ blat_options="-minIdentity=96 -minScore=30"
 // filtering
 gapSize=1000 //minimum distance between the two fusion candidates for the 1st filtering stage
 finalGapSize=10000 //minimum distance for the final filtering
-exclude="NoSupport,PotentialRunThrough" //fusions marked with these classifications will be 
-                           //thrown away. Can be a comma seperated list. 
+exclude="NoSupport,PotentialRunThrough" //fusions marked with these classifications will be
+                           //thrown away. Can be a comma seperated list.
 reassign_dist=0 //minimum distance between low-confidence fusion and others for it to be reassigned to another breakpoint.
 
 //mapping and counting the coverage
@@ -110,6 +111,7 @@ R_get_final_list=codeBase+"/make_final_table.R"
 R_get_spanning_reads_script=codeBase+"/get_spanning_reads.R"
 R_compile_results_script=codeBase+"/compile_results.R"
 oases_assembly_script=codeBase+"/assemble.sh"
+py_frequent_flyers = env['FREQUENT_FLYERS']
 
 //helper scripts
 get_fusion_seqs=codeBase+"/scripts/get_fusion_seqs.bash"
@@ -126,18 +128,19 @@ run_check = {
     }
     produce("checks") {
         exec """
+          date +'%Y-%m-%d %T' ;
             echo "Running JAFFA version $VERSION" ;
             echo "Checking for required data files..." ;
-            for i in $transFasta $transTable $knownTable $genomeFasta ${maskedGenome}.1.bt2 ${transFasta.prefix}.1.bt2 ; 
-                 do ls $i 2>/dev/null || { echo "CAN'T FIND ${i}..." ; 
+            for i in $transFasta $transTable $knownTable $genomeFasta ${maskedGenome}.1.bt2 ${transFasta.prefix}.1.bt2 ;
+                 do ls $i 2>/dev/null || { echo "CAN'T FIND ${i}..." ;
             echo "PLEASE DOWNLOAD and/or FIX PATH... STOPPING NOW" ; exit 1  ; } ; done ;
             echo "All looking good" ;
-            echo "running JAFFA version $VERSION.. checks passed" > $output 
+            echo "running JAFFA version $VERSION.. checks passed" > $output
         ""","checks"
     }
 }
 
-//Read trimming, ID fixing and filtering out reads 
+//Read trimming, ID fixing and filtering out reads
 //that map to chrM, introns and intergenetic regions
 prepare_reads = {
     doc "Prepare reads"
@@ -147,6 +150,7 @@ prepare_reads = {
                 branch+"_leftover_reads.fastq.gz"){
 		// branch+".transCounts") {
             exec """
+              date +'%Y-%m-%d %T' ;
                 $trimmomatic SE -threads $threads -phred$scores $input.gz
                     ${output.dir}/${branch}_trim.fastq
                     LEADING:$minQScore TRAILING:$minQScore MINLEN:$minlen ;
@@ -154,7 +158,7 @@ prepare_reads = {
                     --al-gz $output1
                     --un ${output.dir}/temp_trans_unmap_reads.fastq
                     -p $threads -x $transFasta.prefix
-                    -U ${output.dir}/${branch}_trim.fastq 
+                    -U ${output.dir}/${branch}_trim.fastq
 		    -S /dev/null ;
                 $bowtie2 $mapParams --very-fast
                     --un-gz $output2 -p $threads -x $maskedGenome
@@ -172,6 +176,7 @@ prepare_reads = {
                 // need to check here for whether the files are zipped - FIX
                 //trim & fix the file names so Trinity handles the paired-ends reads correctly
             exec """
+              date +'%Y-%m-%d %T' ;
                 $trimmomatic PE -threads $threads -phred$scores $input1 $input2
                     ${output.dir}/tempp1.fq /dev/null
                     ${output.dir}/tempp2.fq /dev/null
@@ -190,12 +195,12 @@ prepare_reads = {
                 fix_ids ${output.dir}/tempp2.fq 2 > ${output.dir}/${branch}_trim2.fastq ;
                 rm ${output.dir}/tempp1.fq ${output.dir}/tempp2.fq ;
 
-                $bowtie2 $mapParams --very-fast 
+                $bowtie2 $mapParams --very-fast
                     --al-conc-gz ${output1.prefix.prefix}.gz
                     --un-conc ${output.dir}/temp_trans_unmap_reads.fastq
                     -p $threads -x $transFasta.prefix
                     -1 ${output.dir}/${branch}_trim1.fastq
-                    -2 ${output.dir}/${branch}_trim2.fastq 
+                    -2 ${output.dir}/${branch}_trim2.fastq
 		    -S /dev/null ;
 
                 $bowtie2 $mapParams --very-fast
@@ -236,6 +241,7 @@ get_unmapped = {
                 input_string = "$input1,$input2"
             }
             exec """
+              date +'%Y-%m-%d %T' ;
                $bowtie2 -k1 -p $threads --un ${output.dir}/unmapped.fastq
                    -x $transFasta.prefix -U $input_string |
                $samtools view -s 1.0 -F 4 -S -b - |
@@ -265,6 +271,7 @@ get_assembly_unmapped = {
                 input_string = "$input1,$input2"
             }
             exec """
+              date +'%Y-%m-%d %T' ;
                $bowtie2 -k1 -p $threads --un ${output.dir}/unmapped_ref.fastq -x $transFasta.prefix
                    -U $input_string |
                $samtools view -s 1.0 -F 4 -S -b - |
@@ -290,6 +297,7 @@ run_assembly = {
     produce(branch+".fasta") {
         from("*_filtered_reads.fastq*gz") {
             exec """
+              date +'%Y-%m-%d %T' ;
                 time $oases_assembly_script $velveth $velvetg $oases
                 ${output.dir} $output $Ks $Kmerge $transLength $threads $inputs
             ""","run_assembly"
@@ -300,28 +308,30 @@ run_assembly = {
 
 //Align transcripts to the annotation
 //A bit redundant as we also have align_reads_to_annotation, but
-//this ensures the pipelines are separated for the hybrid mode. 
+//this ensures the pipelines are separated for the hybrid mode.
 align_transcripts_to_annotation = {
     doc "Align transcripts to annotation"
     output.dir=jaffa_output+branch
     produce(branch+".paf") {
         from(".fasta") {
             exec """
-		   time $blastn -db ${refBase}/${genome}_${annotation}_blast -query $input 
+              date +'%Y-%m-%d %T' ;
+		   time $blastn -db ${refBase}/${genome}_${annotation}_blast -query $input
 		      -outfmt $blast_out_fmt $blast_options -num_threads $threads > $output ;
             ""","align_transcripts_to_annotation"
         }
     }
 }
 
-//Align the reads to the annotation 
+//Align the reads to the annotation
 align_reads_to_annotation = {
     doc "Align reads to annotation"
     output.dir=jaffa_output+branch
     produce(input.prefix+".paf") {
         from(".fasta") {
             exec """
-		   time $blastn -db ${refBase}/${genome}_${annotation}_blast -query $input 
+              date +'%Y-%m-%d %T' ;
+		   time $blastn -db ${refBase}/${genome}_${annotation}_blast -query $input
 		      -outfmt $blast_out_fmt $blast_options -num_threads $threads > $output ;
             ""","align_reads_to_annotation"
         }
@@ -336,10 +346,11 @@ filter_transcripts = {
     produce(input.prefix+".txt"){ // ,branch+".geneCounts") {
         from(".paf") {
             exec """
+              date +'%Y-%m-%d %T' ;
 	    $process_transcriptome_align_table $input $gapSize $transTable > $output1
             ""","filter_transcripts"
         }
-	// code related to obtaining gene-level counts in below 
+	// code related to obtaining gene-level counts in below
 	//sort -u -k1,1 $input | cut -f6 | sort | uniq -c | sed 's/^ *//g' >> ${output.dir}/${branch}.transCounts ;
 	//$make_count_table ${output.dir}/${branch}.transCounts $transTable > $output2 ;
     }
@@ -352,13 +363,14 @@ extract_fusion_sequences = {
     produce(input.prefix+".fusions.fa") {
         from(".txt", ".fasta") {
             exec """
+              date +'%Y-%m-%d %T' ;
                 cat $input1 | awk '{print \$1}' > ${output}.temp ;
                 $reformat in=$input2 out=stdout.fasta fastawrap=0 | $extract_seq_from_fasta ${output}.temp > $output ;
                 rm ${output}.temp ;
             ""","extract_fusion_sequences"
         }
     }
-} 
+}
 
 //Map the reads back to the candidate fusion sequences
 map_reads = {
@@ -373,15 +385,16 @@ map_reads = {
                 input_string="-1 $input2 -2 $input3"
             }
             exec """
+              date +'%Y-%m-%d %T' ;
                 ${bowtie2}-build $input1 $input1.prefix ;
-                $bowtie2 $mapParams --no-unal -p $threads -x $input1.prefix $input_string | 
+                $bowtie2 $mapParams --no-unal -p $threads -x $input1.prefix $input_string |
                 $samtools view -S -b - | $samtools sort - ${output.dir}/${branch}.sorted ;
                 $samtools index $output
             ""","map_reads"
         }
     }
-} 
- 
+}
+
 //Calculate the number of reads which span the breakpoint of the fusions
 //Used for assembly mode
 get_spanning_reads = {
@@ -389,10 +402,11 @@ get_spanning_reads = {
     output.dir=jaffa_output+branch
     produce(input.txt.prefix+".reads") {
        from("txt","bam") {
-           exec """ 
+           exec """
+            date +'%Y-%m-%d %T' ;
                $samtools view $input2 | cut -f 3,4,8  > ${output.dir}/${branch}.temp ;
                $samtools view $input2 | cut -f 10 | awk '{print length}' > ${output.dir}/${branch}.readLengths ;
-               $R --vanilla --args ${output.dir}/${branch} $input1 ${output.dir}/${branch}.temp 
+               $R --vanilla --args ${output.dir}/${branch} $input1 ${output.dir}/${branch}.temp
                    $output ${output.dir}/${branch}.readLengths $overHang < $R_get_spanning_reads_script ;
                rm ${output.dir}/${branch}.temp ${output.dir}/${branch}.readLengths
            ""","get_spanning_reads"
@@ -401,13 +415,14 @@ get_spanning_reads = {
 }
 
 //Used for the direct and hybrid pipelines - In this case the spanning reads will be 1 for each
-//read and the spanning pairs will be 0. 
+//read and the spanning pairs will be 0.
 make_simple_reads_table = {
     doc "Calculate the number of reads which span the breakpoint of the fusions"
     output.dir=jaffa_output+branch
     produce(input.txt.prefix+".reads") {
         from(".txt", "*_discordant_pairs.bam") {
 	   exec """
+      date +'%Y-%m-%d %T' ;
 	      $samtools view $input2 | cut -f1-3 | $make_simple_read_table $input1 $transTable > $output
 	   ""","make_simple_reads_table"
 	   }
@@ -421,7 +436,8 @@ make_fasta_reads_table = {
     produce(input.txt.prefix+".reads") {
         from("txt") {
             exec """
-                echo  -e "transcript\tbreak_min\tbreak_max\tfusion_genes\tspanning_pairs\tspanning_reads" > $output ; 
+              date +'%Y-%m-%d %T' ;
+                echo  -e "transcript\tbreak_min\tbreak_max\tfusion_genes\tspanning_pairs\tspanning_reads" > $output ;
                 awk '{ print \$1"\t"\$2"\t"\$3"\t"\$4"\t"0"\t"1}' $input | sort -u  >> $output
             ""","make_fasta_reads_table"
         }
@@ -437,6 +453,7 @@ merge_assembly_and_unmapped_reads_candidates = {
     produce(branch+".all.fusions.fa", branch+".all.reads") {
         from("fusions.fa", branch+".fusions.fa", "reads", branch+".reads") {
             exec """
+              date +'%Y-%m-%d %T' ;
                 cat $input1 $input2 > $output1 ;
                 cp $input3 $output2 ; tail -n+2 $input4 >> $output2
             ""","merge_assembly_and_unmapped_reads_candidates"
@@ -452,6 +469,7 @@ align_transcripts_to_genome = {
     produce(branch+"_genome.psl") {
         from(".fusions.fa") {
             exec """
+              date +'%Y-%m-%d %T' ;
 	       if [ ! -s $input ]; then
 	          touch $output ;
 	       else
@@ -462,6 +480,28 @@ align_transcripts_to_genome = {
     }
 }
 
+
+// Clean most of the false positives created in rRNA depletion reads
+remove_frequent_flyers = {
+  doc "Remove frequent flyers"
+  output.dir=jaffa_output+branch
+  produce(branch+".reads.clean") {
+      from(".reads") {
+          exec """
+            date +'%Y-%m-%d %T' ;
+            if [ ! -s $input1 ] ; then
+              touch $output ;
+            else
+              python $py_frequent_flyers --input $input1 --max-fusions 100 --software JAFFA ;
+              mv $input1 ${input1}.unfiltered ;
+              cp ${input1}.clean $input1 ;
+            fi;
+          ""","remove_frequent_flyers"
+      }
+  }
+}
+
+
 //Do a bit more filtering and compile the final filtered list (uses an R script)
 get_final_list = {
     doc "Get final list"
@@ -469,10 +509,11 @@ get_final_list = {
     produce(branch+".summary") {
         from(".psl", ".reads") { //, ".geneCounts") {
             exec """
+              date +'%Y-%m-%d %T' ;
 	        if [ ! -s $input1 ] ; then
 		   touch $output ;
- 		else 
-                   $R --vanilla --args $input1 $input2 $transTable $knownTable 
+ 		else
+                   $R --vanilla --args $input1 $input2 $transTable $knownTable
 		   $finalGapSize $exclude $reassign_dist $output < $R_get_final_list ;
 		 fi;
             ""","get_final_list"
@@ -484,13 +525,14 @@ get_final_list = {
 //Make a fasta file with the candidates
 compile_all_results = {
     doc "Compile all results"
-    var type : "" 
+    var type : ""
     if (jaffa_output) {
         output.dir=jaffa_output
     }
     produce(outputName+".fasta",outputName+".csv") {
         // change to the jaffa output directory
         exec """
+          date +'%Y-%m-%d %T' ;
             cd ${output.dir} ;
             $R --vanilla --args $outputName $inputs.summary < $R_compile_results_script ;
             rm -f ${outputName}.fasta ;
@@ -506,4 +548,3 @@ compile_all_results = {
         ""","compile_all_results"
     }
 }
-
